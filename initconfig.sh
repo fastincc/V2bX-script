@@ -109,6 +109,10 @@ add_node_config() {
     if [ "$ipv6_support" -eq 1 ]; then
         listen_ip="::"
     fi
+    anytls_audit_config=""
+    if [ "$core" = "sing" ] && [ "$NodeType" = "anytls" ]; then
+        anytls_audit_config='"AnyTLSAuditAccess": true,'
+    fi
     node_config=""
     if [ "$core_type" == "1" ]; then 
     node_config=$(cat <<EOF
@@ -146,6 +150,7 @@ EOF
     node_config=$(cat <<EOF
 {
             "Core": "$core",
+            $anytls_audit_config
             "ApiHost": "$ApiHost",
             "ApiKey": "$ApiKey",
             "NodeID": $NodeID,

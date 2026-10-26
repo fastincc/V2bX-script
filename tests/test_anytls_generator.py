@@ -14,4 +14,5 @@ for name,answers,core,expected in [
   c=json.loads((p/'config.json').read_text());level=next(x['Log']['Level'] for x in c['Cores'] if x['Type']==core)
   assert level==expected,(name,level)
   assert c['Nodes'][0]['NodeID']==42 and c['Nodes'][0]['ApiHost']=='https://example.invalid'
+  assert c['Nodes'][0].get('AnyTLSAuditAccess') is (True if name=='anytls' else None)
   print(name,'PASS',level)
