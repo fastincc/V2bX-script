@@ -71,6 +71,9 @@ add_node_config() {
             * ) NodeType="shadowsocks" ;;
         esac
     fi
+    if [ "$core" = "sing" ] && [ "$NodeType" = "anytls" ]; then
+        sing_log_level="info"
+    fi
     fastopen=true
     if [ "$NodeType" == "vless" ]; then
         read -rp "请选择是否为reality节点？(y/n)" isreality
@@ -219,6 +222,7 @@ generate_config_file() {
     first_node=true
     core_xray=false
     core_sing=false
+    sing_log_level="error"
     core_hysteria2=false
     fixed_api_info=false
     check_api=false
@@ -269,7 +273,7 @@ generate_config_file() {
     {
         \"Type\": \"sing\",
         \"Log\": {
-            \"Level\": \"error\",
+            \"Level\": \"$sing_log_level\",
             \"Timestamp\": true
         },
         \"NTP\": {
