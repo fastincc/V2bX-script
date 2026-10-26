@@ -22,9 +22,10 @@ wget -N https://raw.githubusercontent.com/fastincc/V2bX-script/main/install.sh &
 
 ## AnyTLS real-IP / audit release
 
-`fastincc-v0.4.1-2` supports optional AnyTLS PROXY protocol and structured audit
-logging. Installation does not enable either feature or overwrite an existing
-config.json. See [configuration and audit contract](https://github.com/fastincc/V2bX/blob/main/docs/ANYTLS.md).
+`fastincc-v0.4.1-3` defaults AnyTLS PROXY v2 reception ON (3-second timeout, no
+relay allowlist). Audit remains OFF. Installation preserves an existing
+config.json, but an omitted PROXY setting now enables reception. Direct/no-header
+listeners must explicitly set `AnyTLSProxyProtocol.Enable` to false before upgrading. See [configuration and audit contract](https://github.com/fastincc/V2bX/blob/main/docs/ANYTLS.md).
 Enable PROXY reception only when the relay sends the configured header; direct
 clients without that header cannot connect to an enabled listener. Without a
 trusted-relay allowlist, the client address is declared and unverified.
@@ -38,5 +39,5 @@ signature if the distribution repository itself is compromised.
 ```sh
 # Pin the release for a controlled install/update:
 curl -fL https://raw.githubusercontent.com/fastincc/V2bX-script/main/install.sh -o install.sh
-bash install.sh fastincc-v0.4.1-2
+bash install.sh fastincc-v0.4.1-3
 ```
