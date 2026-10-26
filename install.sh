@@ -124,12 +124,10 @@ check_status() {
 }
 
 install_V2bX() {
-    if [[ -e /usr/local/V2bX/ ]]; then
-        rm -rf /usr/local/V2bX/
-    fi
-
-    mkdir /usr/local/V2bX/ -p
-    cd /usr/local/V2bX/
+    # Validate the complete archive before touching an existing installation.
+    download_dir=$(mktemp -d) || exit 1
+    trap 'rm -rf "$download_dir"' EXIT
+    cd "$download_dir" || exit 1
 
     if  [ $# == 0 ] ;then
         last_version=$(curl -Ls "https://api.github.com/repos/fastincc/V2bX/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
@@ -138,7 +136,7 @@ install_V2bX() {
             exit 1
         fi
         echo -e "检测到 V2bX 最新版本：${last_version}，开始安装"
-        wget -N --progress=bar -O /usr/local/V2bX/V2bX-linux.zip https://github.com/fastincc/V2bX/releases/download/${last_version}/V2bX-linux-${arch}.zip
+        wget -N --progress=bar -O "$download_dir/V2bX-linux.zip" https://github.com/fastincc/V2bX/releases/download/${last_version}/V2bX-linux-${arch}.zip
         if [[ $? -ne 0 ]]; then
             echo -e "${red}下载 V2bX 失败，请确保你的服务器能够下载 Github 的文件${plain}"
             exit 1
@@ -147,16 +145,33 @@ install_V2bX() {
         last_version=$1
         url="https://github.com/fastincc/V2bX/releases/download/${last_version}/V2bX-linux-${arch}.zip"
         echo -e "开始安装 V2bX $1"
-        wget -N --progress=bar -O /usr/local/V2bX/V2bX-linux.zip ${url}
+        wget -N --progress=bar -O "$download_dir/V2bX-linux.zip" ${url}
         if [[ $? -ne 0 ]]; then
             echo -e "${red}下载 V2bX $1 失败，请确保此版本存在${plain}"
             exit 1
         fi
     fi
 
-    unzip V2bX-linux.zip
-    rm V2bX-linux.zip -f
-    chmod +x V2bX
+    digest_url="https://github.com/fastincc/V2bX/releases/download/${last_version}/V2bX-linux-${arch}.zip.dgst"
+    curl --fail --show-error --location --retry 3 "$digest_url" -o V2bX-linux.zip.dgst || exit 1
+    expected_sha=$(awk 'toupper($1) ~ /^SHA(2-)?256=?$/ {print tolower($NF)}' V2bX-linux.zip.dgst)
+    [[ "$expected_sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid release SHA256 digest"; exit 1; }
+    actual_sha=$(sha256sum V2bX-linux.zip | awk '{print $1}')
+    [[ "$actual_sha" == "$expected_sha" ]] || { echo "Release SHA256 mismatch; existing installation unchanged"; exit 1; }
+    unzip -tq V2bX-linux.zip >/dev/null || exit 1
+    mkdir extracted || exit 1
+    unzip -q V2bX-linux.zip -d extracted || exit 1
+    [[ -f extracted/V2bX && -f extracted/config.json && -f extracted/geoip.dat && -f extracted/geosite.dat ]] || exit 1
+    chmod +x extracted/V2bX
+    extracted/V2bX version || exit 1
+    if [[ x"${release}" == x"alpine" ]]; then
+        service V2bX stop >/dev/null 2>&1 || true
+    else
+        systemctl stop V2bX >/dev/null 2>&1 || true
+    fi
+    mkdir -p /usr/local/V2bX || exit 1
+    cp -a extracted/. /usr/local/V2bX/ || exit 1
+    cd /usr/local/V2bX/ || exit 1
     mkdir /etc/V2bX/ -p
     cp geoip.dat /etc/V2bX/
     cp geosite.dat /etc/V2bX/
