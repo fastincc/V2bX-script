@@ -38,3 +38,8 @@ Prepared 2026-10-26 (Asia/Shanghai). No production deployment.
 - Restart, stop and confirmed uninstall passed; temporary service, binary directory and test configuration were removed.
 - This preserves upstream implementation; it does not claim current security patch coverage or end-to-end acceptance of every protocol. Proxy Protocol/AnyTLS real-IP adaptation is not included.
 - Upstream dependency hosts and external BBR/documentation links remain external; they have not been mirrored or executed in this test.
+
+
+## AnyTLS release update — 2026-10-26
+
+Installer commit 57cc45d verifies SHA256 and ZIP integrity before changing an existing installation. Invalid digest/mismatch negative tests passed. Old-to-new configuration-preserving upgrade, latest-release fresh install, sing/Xray startup, restart, stop, binary rollback and uninstall passed on Linux x86_64. Version fastincc-v0.4.1-2 was installed; existing live experimental service was unchanged. Both new features remain disabled by default. See [release evidence](https://github.com/fastincc/V2bX/blob/main/docs/RELEASE-0.4.1-2.md).
