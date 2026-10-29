@@ -33,25 +33,25 @@ else
     echo -e "${red}未检测到系统版本，请联系脚本作者！${plain}\n" && exit 1
 fi
 
-arch=$(uname -m)
-
-if [[ $arch == "x86_64" || $arch == "x64" || $arch == "amd64" ]]; then
-    arch="64"
-elif [[ $arch == "aarch64" || $arch == "arm64" ]]; then
-    arch="arm64-v8a"
-elif [[ $arch == "s390x" ]]; then
-    arch="s390x"
-else
-    arch="64"
-    echo -e "${red}检测架构失败，使用默认架构: ${arch}${plain}"
-fi
+machine_arch=$(uname -m)
+case "$machine_arch" in
+    x86_64|x64|amd64) arch="64" ;;
+    aarch64|arm64) arch="arm64-v8a" ;;
+    armv7l|armv7) arch="arm32-v7a" ;;
+    s390x)
+        if [[ $# -eq 0 ]]; then
+            echo "最新版默认发布不再包含 s390x；请显式指定仍提供该架构的旧版本（例如 fastincc-v0.4.1-7）。"
+            exit 1
+        fi
+        arch="s390x"
+        ;;
+    *)
+        echo "不支持的系统架构：${machine_arch}。支持 amd64、arm64、armv7；不会回退下载 amd64 包。"
+        exit 1
+        ;;
+esac
 
 echo "架构: ${arch}"
-
-if [ "$(getconf WORD_BIT)" != '32' ] && [ "$(getconf LONG_BIT)" != '64' ] ; then
-    echo "本软件不支持 32 位系统(x86)，请使用 64 位系统(x86_64)，如果检测有误，请联系作者"
-    exit 2
-fi
 
 # os version
 if [[ -f /etc/os-release ]]; then
