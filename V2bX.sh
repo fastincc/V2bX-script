@@ -5,6 +5,72 @@ green='\033[0;32m'
 yellow='\033[0;33m'
 plain='\033[0m'
 
+# BEGIN reliable reporting summary (keep identical in install.sh and V2bX.sh)
+reporting_invocation() {
+    [[ "$release" != "alpine" ]] || return 1
+    systemctl show V2bX.service --property=InvocationID --value 2>/dev/null
+}
+
+parse_reporting_status() {
+    awk '
+    /^V2BX_REPORTING_RESET_V1$/ { delete state; delete mode; delete id; delete kind; delete order; count=0; bad=0; reset=1; next }
+    /^V2BX_REPORTING_STATUS_V1 / {
+        if (!reset) next
+        if (NF!=6 || $2 !~ /^binding=[0-9a-f]+$/ || length($2)!=72 || $3 !~ /^node_id=[0-9]+$/ || $4 !~ /^node_type=[a-z0-9]+$/ || $5 !~ /^state=(enabled|disabled|unknown)$/ || $6 !~ /^mode=(auto|on|off|unknown)$/) { bad=1; next }
+        key=substr($2,9)
+        if (!(key in state)) order[++count]=key
+        id[key]=substr($3,9); kind[key]=substr($4,11); state[key]=substr($5,7); mode[key]=substr($6,6)
+    }
+    END {
+        if (!reset || !count || bad) exit 2
+        pending=0
+        for (i=1;i<=count;i++) {
+            key=order[i]; label="状态未确认"
+            if (state[key]=="enabled") label="可靠上报已启用"
+            else if (state[key]=="disabled") label="可靠上报未启用"
+            else pending=1
+            printf "节点 %s（%s，标识 %.12s）：%s（模式 %s）\n",id[key],kind[key],key,label,mode[key]
+        }
+        exit pending
+    }'
+}
+
+show_reporting_status() {
+    local previous="${1:-}" invocation after active records summary attempt parsed
+    echo "可靠上报状态："
+    if [[ "$release" == "alpine" || "$previous" == "unavailable" ]]; then
+        echo "状态未确认：无法读取本次服务启动标识，请查看运行日志。"
+        return 0
+    fi
+    for attempt in 1 2 3 4 5; do
+        invocation=$(reporting_invocation) || invocation=""
+        active=$(systemctl show V2bX.service --property=ActiveState --value 2>/dev/null)
+        summary=""
+        if [[ "$active" == "active" && "$invocation" =~ ^[0-9a-fA-F]{32}$ && "$invocation" != "$previous" ]]; then
+            if records=$(journalctl "_SYSTEMD_INVOCATION_ID=$invocation" --no-pager -o cat -n 2000 2>/dev/null); then
+                summary=$(printf '%s\n' "$records" | parse_reporting_status)
+                parsed=$?
+                after=$(reporting_invocation) || after=""
+                active=$(systemctl show V2bX.service --property=ActiveState --value 2>/dev/null)
+                if [[ "$after" != "$invocation" || "$active" != "active" ]]; then
+                    summary=""
+                elif [[ $parsed -eq 0 ]]; then
+                    printf '%s\n' "$summary"
+                    return 0
+                fi
+            fi
+        fi
+        [[ $attempt -eq 5 ]] || sleep 1
+    done
+    if [[ -n "$summary" ]]; then
+        printf '%s\n' "$summary"
+    else
+        echo "状态未确认：服务未就绪、日志不可读或当前版本未提供专用状态；不能据此判断为关闭。"
+    fi
+    return 0
+}
+# END reliable reporting summary
+
 # check root
 [[ $EUID -ne 0 ]] && echo -e "${red}错误: ${plain} 必须使用root用户运行此脚本！\n" && exit 1
 
@@ -222,6 +288,8 @@ stop() {
 }
 
 restart() {
+    local reporting_before
+    reporting_before=$(reporting_invocation) || reporting_before="unavailable"
     if [[ x"${release}" == x"alpine" ]]; then
         service V2bX restart
     else
@@ -234,6 +302,7 @@ restart() {
     else
         echo -e "${red}V2bX可能启动失败，请稍后使用 V2bX log 查看日志信息${plain}"
     fi
+    show_reporting_status "$reporting_before"
     if [[ $# == 0 ]]; then
         before_show_menu
     fi
